@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบเช็ก OT และบันทึกเงินออม (ส.ค. - พ.ย. 2026)</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #f1f5f9;
+            --card-bg: #1e293b;
+            --header-title: #60a5fa;
+            --subtitle-color: #94a3b8;
+            --border-color: #334155;
+            --day-bg: #0f172a;
+            --day-hover: #1e293b;
+            --input-border: #475569;
+            --input-bg: #0f172a;
+            --shadow-color: rgba(0,0,0,0.3);
+            --log-bg: #0f172a;
+
+            --ot-active-border: #10b981;
+            --ot-active-bg: rgba(16, 185, 129, 0.2);
+            --ot-active-shadow: rgba(16, 185, 129, 0.25);
+
+            --today-indicator: #38bdf8;
+            --today-bg: rgba(56, 189, 248, 0.25);
+        }
+
+        body.light-mode {
+            --bg-color: #f0f4f8;
+            --text-color: #333333;
+            --card-bg: #ffffff;
+            --header-title: #1e3a8a;
+            --subtitle-color: #64748b;
+            --border-color: #e2e8f0;
+            --day-bg: #f8fafc;
+            --day-hover: #eff6ff;
+            --input-border: #cbd5e1;
+            --input-bg: #ffffff;
+            --shadow-color: rgba(0,0,0,0.05);
+            --log-bg: #f8fafc;
+
+            --ot-active-border: #059669;
+            --ot-active-bg: rgba(5, 150, 105, 0.15);
+            --ot-active-shadow: rgba(5, 150, 105, 0.2);
+
+            --today-indicator: #0284c7;
+            --today-bg: rgba(2, 132, 199, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Kanit', -apple-system, BlinkMacSystemFont, sans-serif;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 12px;
+            color: var(--text-color);
+        }
+
+        .main-wrapper {
+            max-width: 1480px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        @media (min-width: 1024px) {
+            body { padding: 20px; }
+            .main-wrapper { flex-direction: row; align-items: flex-start; }
+            .sidebar { width: 300px; position: sticky; top: 20px; }
+            .log-section { width: 320px; position: sticky; top: 20px; }
+        }
+
+        .theme-toggle-btn {
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            color: var(--text-color);
+            padding: 6px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .calendar-section { flex: 1; min-width: 0; }
+        
+        .page-header {
+            background: var(--card-bg);
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px var(--shadow-color);
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .page-header h1 {
+            margin: 0 0 4px 0;
+            color: var(--header-title);
+            font-size: 1.3rem;
+        }
+
+        .page-header p {
+            margin: 0;
+            color: var(--subtitle-color);
+            font-size: 0.8rem;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .month-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 4px 6px var(--shadow-color);
+        }
+
+        .month-title {
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--header-title);
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .days-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            color: var(--subtitle-color);
+            margin-bottom: 6px;
+        }
+
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+
+        .day-box {
+            height: 48px;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: var(--day-bg);
+            user-select: none;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .day-box.empty {
+            background: transparent;
+            border: none;
+            cursor: default;
+        }
+
+        .day-box.is-ot {
+            border: 2px solid var(--ot-active-border) !important;
+            background-color: var(--ot-active-bg) !important;
+        }
+
+        .day-number {
+            font-size: 0.85rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+        }
+
+        .day-hours {
+            font-size: 0.6rem;
+            color: var(--ot-active-border);
+            font-weight: bold;
+        }
+
+        .day-box.is-today .day-number {
+            background-color: var(--today-indicator);
+            color: #ffffff !important;
+        }
+
+        .panel-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 6px var(--shadow-color);
+        }
+
+        .panel-title {
+            font-size: 1rem;
+            font-weight: bold;
+            margin-top: 0;
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .input-group { margin-bottom: 12px; }
+        .input-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: var(--subtitle-color);
+            margin-bottom: 4px;
+        }
+
+        .input-control-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .setting-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid var(--input-border);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: var(--text-color);
+            background-color: var(--input-bg);
+            outline: none;
+        }
+
+        .btn-action-save {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .stat-card {
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            color: white;
+        }
+
+        .stat-card.blue { background: linear-gradient(135deg, #2563eb, #3b82f6); }
+        .stat-card.green { background: linear-gradient(135deg, #059669, #10b981); }
+        .stat-card.amber { background: linear-gradient(135deg, #d97706, #f59e0b); }
+        .stat-card.purple { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+
+        .stat-label { font-size: 0.75rem; opacity: 0.9; }
+        .stat-value { font-size: 1.2rem; font-weight: bold; }
+
+        .log-container {
+            max-height: 300px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .log-item {
+            background: var(--log-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-delete-log {
+            background: transparent;
+            border: none;
+            color: #ef4444;
+            font-size: 1rem;
+        }
+
+        .btn-clear-all {
+            font-size: 0.75rem;
+            color: #ef4444;
+            background: transparent;
+            border: 1px solid #ef4444;
+            border-radius: 4px;
+            padding: 2px 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-wrapper">
+    <div class="calendar-section">
+        <div class="page-header">
+            <button class="theme-toggle-btn" id="theme-toggle">
+                <span id="theme-icon">☀️</span> <span id="theme-text">โหมดสว่าง</span>
+            </button>
+            <h1>⏰ ตารางเช็ก OT & บันทึกเงินออม</h1>
+            <p>แตะวันที่ทำ OT เพื่อกรอกชั่วโมง | วงกลมฟ้า = วันนี้</p>
+        </div>
+        <div class="calendar-grid" id="calendar-container"></div>
+    </div>
+
+    <aside class="sidebar">
+        <div class="panel-card">
+            <h2 class="panel-title">⚙️ ตั้งค่า & บันทึกออมเงิน</h2>
+            
+            <div class="input-group">
+                <label for="ot-rate-input">อัตราค่า OT ต่อชั่วโมง:</label>
+                <div class="input-control-wrapper">
+                    <input type="number" id="ot-rate-input" class="setting-input" value="60" inputmode="decimal">
+                    <span style="font-size: 0.85rem;">บาท/ชม.</span>
+                </div>
+            </div>
+
+            <hr style="border: none; border-top: 1px dashed var(--border-color); margin: 12px 0;">
+
+            <div class="input-group">
+                <label for="save-amount-input">จำนวนเงินออมรอบนี้:</label>
+                <div class="input-control-wrapper">
+                    <input type="number" id="save-amount-input" class="setting-input" placeholder="กรอกยอดเงิน..." inputmode="decimal">
+                    <span style="font-size: 0.85rem;">บาท</span>
+                </div>
+            </div>
+
+            <button type="button" class="btn-action-save" id="btn-add-save">
+                💰 กดออมเงิน
+            </button>
+
+            <button type="button" class="btn-clear-all" id="btn-clear-ot" style="width: 100%; margin-top: 10px; padding: 6px;">
+                🗑️ ล้างวันที่เพิ่ม OT ทั้งหมด
+            </button>
+        </div>
+
+        <div class="panel-card" style="margin-top: 12px;">
+            <h2 class="panel-title">📊 สรุปภาพรวม</h2>
+            <div class="stat-card blue">
+                <div class="stat-label">รวมชั่วโมง OT ทั้งหมด</div>
+                <div class="stat-value"><span id="total-hours">0</span> ชม.</div>
+            </div>
+            <div class="stat-card green">
+                <div class="stat-label">รายได้ OT รวม</div>
+                <div class="stat-value"><span id="total-ot-income">0</span> บาท</div>
+            </div>
+            <div class="stat-card amber">
+                <div class="stat-label">เงินออมสะสมรวม</div>
+                <div class="stat-value"><span id="total-savings">0</span> บาท</div>
+            </div>
+            <div class="stat-card purple">
+                <div class="stat-label">รวมทั้งหมด (OT + ออมเงิน)</div>
+                <div class="stat-value"><span id="grand-total">0</span> บาท</div>
+            </div>
+        </div>
+    </aside>
+
+    <aside class="log-section">
+        <div class="panel-card">
+            <div class="panel-title">
+                <span>📜 ประวัติการออม (Log)</span>
+                <button class="btn-clear-all" id="btn-clear-logs">ล้าง Log</button>
+            </div>
+            <div class="log-container" id="log-container"></div>
+        </div>
+    </aside>
+</div>
+
+<script>
+    const monthsData = [
+        { name: 'สิงหาคม 2026', year: 2026, month: 7 },
+        { name: 'กันยายน 2026', year: 2026, month: 8 },
+        { name: 'ตุลาคม 2026', year: 2026, month: 9 },
+        { name: 'พฤศจิกายน 2026', year: 2026, month: 10 }
+    ];
+
+    const daysOfWeek = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+    const themeBtn = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
+    const themeText = document.getElementById('theme-text');
+
+    function initTheme() {
+        const isLight = localStorage.getItem('theme_mode') === 'light';
+        if (isLight) {
+            document.body.classList.add('light-mode');
+            themeIcon.innerText = '🌙';
+            themeText.innerText = 'โหมดมืด';
+        } else {
+            document.body.classList.remove('light-mode');
+            themeIcon.innerText = '☀️';
+            themeText.innerText = 'โหมดสว่าง';
+        }
+    }
+
+    themeBtn.addEventListener('click', () => {
+        document.body.classList.toggle('light-mode');
+        const isLight = document.body.classList.contains('light-mode');
+        localStorage.setItem('theme_mode', isLight ? 'light' : 'dark');
+        themeIcon.innerText = isLight ? '🌙' : '☀️';
+        themeText.innerText = isLight ? 'โหมดมืด' : 'โหมดสว่าง';
+    });
+
+    function getSavingsLogs() {
+        const logs = localStorage.getItem('savings_logs');
+        return logs ? JSON.parse(logs) : [];
+    }
+
+    function saveSavingsLogs(logs) {
+        localStorage.setItem('savings_logs', JSON.stringify(logs));
+    }
+
+    function initCalendar() {
+        initTheme();
+
+        const otRateInput = document.getElementById('ot-rate-input');
+        const savedOtRate = localStorage.getItem('ot_hourly_rate');
+        otRateInput.value = savedOtRate !== null ? savedOtRate : 60;
+
+        otRateInput.addEventListener('input', (e) => {
+            localStorage.setItem('ot_hourly_rate', e.target.value);
+            updateSummary();
+        });
+
+        document.getElementById('btn-add-save').addEventListener('click', () => {
+            const input = document.getElementById('save-amount-input');
+            const amount = parseFloat(input.value);
+
+            if (isNaN(amount) || amount <= 0) {
+                alert('กรุณาระบุจำนวนเงินออมให้ถูกต้องครับ');
+                return;
+            }
+
+            const now = new Date();
+            const timeStr = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) + ' ' + 
+                            now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+
+            const newLog = { id: Date.now(), amount: amount, time: timeStr };
+            const logs = getSavingsLogs();
+            logs.unshift(newLog);
+            saveSavingsLogs(logs);
+
+            input.value = '';
+            renderLogs();
+            updateSummary();
+        });
+
+        document.getElementById('btn-clear-logs').addEventListener('click', () => {
+            if (getSavingsLogs().length === 0) return;
+            if (confirm('ล้างประวัติการออมเงินทั้งหมด?')) {
+                localStorage.removeItem('savings_logs');
+                renderLogs();
+                updateSummary();
+            }
+        });
+
+        document.getElementById('btn-clear-ot').addEventListener('click', () => {
+            if (confirm('ล้างวันที่บันทึก OT ทั้งหมด?')) {
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('ot_hours_')) localStorage.removeItem(key);
+                });
+                renderCalendar();
+                updateSummary();
+            }
+        });
+
+        renderCalendar();
+        renderLogs();
+        updateSummary();
+    }
+
+    function renderLogs() {
+        const logContainer = document.getElementById('log-container');
+        const logs = getSavingsLogs();
+
+        if (logs.length === 0) {
+            logContainer.innerHTML = '<div style="text-align:center; color:var(--subtitle-color); font-size:0.85rem; padding:10px;">ยังไม่มีประวัติการออม</div>';
+            return;
+        }
+
+        logContainer.innerHTML = '';
+        logs.forEach(item => {
+            const logItem = document.createElement('div');
+            logItem.className = 'log-item';
+            logItem.innerHTML = `
+                <div>
+                    <strong style="color:#f59e0b;">+${item.amount.toLocaleString()} บาท</strong>
+                    <div style="font-size:0.7rem; color:var(--subtitle-color);">${item.time}</div>
+                </div>
+                <button class="btn-delete-log" onclick="deleteLog(${item.id})">🗑️</button>
+            `;
+            logContainer.appendChild(logItem);
+        });
+    }
+
+    function deleteLog(id) {
+        let logs = getSavingsLogs();
+        logs = logs.filter(l => l.id !== id);
+        saveSavingsLogs(logs);
+        renderLogs();
+        updateSummary();
+    }
+
+    function renderCalendar() {
+        const container = document.getElementById('calendar-container');
+        container.innerHTML = '';
+
+        const todayObj = new Date();
+        const currentYear = todayObj.getFullYear();
+        const currentMonth = todayObj.getMonth();
+        const currentDate = todayObj.getDate();
+
+        monthsData.forEach(m => {
+            const monthCard = document.createElement('div');
+            monthCard.className = 'month-card';
+
+            const title = document.createElement('div');
+            title.className = 'month-title';
+            title.innerText = m.name;
+            monthCard.appendChild(title);
+
+            const daysHeader = document.createElement('div');
+            daysHeader.className = 'days-header';
+            daysOfWeek.forEach(d => {
+                const dayName = document.createElement('div');
+                dayName.innerText = d;
+                daysHeader.appendChild(dayName);
+            });
+            monthCard.appendChild(daysHeader);
+
+            const daysGrid = document.createElement('div');
+            daysGrid.className = 'days-grid';
+
+            const firstDay = new Date(m.year, m.month, 1).getDay();
+            const totalDays = new Date(m.year, m.month + 1, 0).getDate();
+
+            for (let i = 0; i < firstDay; i++) {
+                const emptyBox = document.createElement('div');
+                emptyBox.className = 'day-box empty';
+                daysGrid.appendChild(emptyBox);
+            }
+
+            for (let day = 1; day <= totalDays; day++) {
+                const dayBox = document.createElement('div');
+                dayBox.className = 'day-box';
+
+                const dayNum = document.createElement('span');
+                dayNum.className = 'day-number';
+                dayNum.innerText = day;
+                dayBox.appendChild(dayNum);
+
+                const otStorageKey = `ot_hours_${m.year}_${m.month}_${day}`;
+                const savedHours = parseFloat(localStorage.getItem(otStorageKey)) || 0;
+
+                if (savedHours > 0) {
+                    dayBox.classList.add('is-ot');
+                    const hoursBadge = document.createElement('span');
+                    hoursBadge.className = 'day-hours';
+                    hoursBadge.innerText = `${savedHours} ชม.`;
+                    dayBox.appendChild(hoursBadge);
+                }
+
+                if (m.year === currentYear && m.month === currentMonth && day === currentDate) {
+                    dayBox.classList.add('is-today');
+                }
+
+                dayBox.addEventListener('click', () => {
+                    const currentHours = parseFloat(localStorage.getItem(otStorageKey)) || 0;
+                    const inputStr = prompt(`จำนวนชั่วโมง OT วันที่ ${day} ${m.name}:`, currentHours > 0 ? currentHours : 1);
+                    
+                    if (inputStr === null) return;
+
+                    const hours = parseFloat(inputStr);
+                    if (isNaN(hours) || hours < 0) {
+                        alert('กรุณากรอกตัวเลขให้ถูกต้อง');
+                        return;
+                    }
+
+                    let hoursBadge = dayBox.querySelector('.day-hours');
+
+                    if (hours === 0) {
+                        localStorage.removeItem(otStorageKey);
+                        dayBox.classList.remove('is-ot');
+                        if (hoursBadge) hoursBadge.remove();
+                    } else {
+                        localStorage.setItem(otStorageKey, hours);
+                        dayBox.classList.add('is-ot');
+                        if (!hoursBadge) {
+                            hoursBadge = document.createElement('span');
+                            hoursBadge.className = 'day-hours';
+                            dayBox.appendChild(hoursBadge);
+                        }
+                        hoursBadge.innerText = `${hours} ชม.`;
+                    }
+                    updateSummary();
+                });
+
+                daysGrid.appendChild(dayBox);
+            }
+
+            monthCard.appendChild(daysGrid);
+            container.appendChild(monthCard);
+        });
+    }
+
+    function updateSummary() {
+        let totalHours = 0;
+
+        monthsData.forEach(m => {
+            const totalDays = new Date(m.year, m.month + 1, 0).getDate();
+            for (let day = 1; day <= totalDays; day++) {
+                const otStorageKey = `ot_hours_${m.year}_${m.month}_${day}`;
+                const hours = parseFloat(localStorage.getItem(otStorageKey)) || 0;
+                totalHours += hours;
+            }
+        });
+
+        document.getElementById('total-hours').innerText = totalHours;
+
+        const otRate = parseFloat(document.getElementById('ot-rate-input').value) || 0;
+        const totalOtIncome = totalHours * otRate;
+        document.getElementById('total-ot-income').innerText = totalOtIncome.toLocaleString();
+
+        const logs = getSavingsLogs();
+        const totalSavingsAmount = logs.reduce((sum, item) => sum + item.amount, 0);
+        document.getElementById('total-savings').innerText = totalSavingsAmount.toLocaleString();
+
+        const grandTotal = totalOtIncome + totalSavingsAmount;
+        document.getElementById('grand-total').innerText = grandTotal.toLocaleString();
+    }
+
+    window.onload = initCalendar;
+</script>
+
+</body>
+</html>
